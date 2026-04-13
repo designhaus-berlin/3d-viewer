@@ -289,6 +289,7 @@ if (showGui) {
         detectWheels(root);
         frameObject(root, 1.35);
         progressEl.hidden = true;
+        post({type:'modelReady', payload:{ url }});
       }catch(err){
         progressEl.textContent = 'Fehler beim Laden';
         post({type:'error', payload:{code:'MODEL_LOAD', message: String(err)}});
@@ -489,7 +490,7 @@ function resolveSelector(sel){
       pointer.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
       pointer.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const objs = []; root && root.traverse(o=>{ if (o.isMesh) objs.push(o); });
+      const objs = []; root && root.traverse(o=>{ if (o.isMesh && o.visible) objs.push(o); });
       const hit = raycaster.intersectObjects(objs, true)[0];
       if (!hit) return;
       const m = hit.object;
@@ -794,25 +795,32 @@ switch(type){
 
   // ── Legacy API (Abwärtskompatibilität) ──────────────────────────
   case 'setCamera':
+    console.warn('[3d-viewer] "setCamera" is deprecated — use "animateCamera" instead.');
     setCamera(payload?.position, payload?.target, payload?.durationMs);
     break;
   case 'setVisible':
+    console.warn('[3d-viewer] "setVisible" is deprecated — use "setVisibility" instead.');
     setVisible(payload?.selector, payload?.visible !== false);
     break;
   case 'enableOrbit':
+    console.warn('[3d-viewer] "enableOrbit" is deprecated — use "setOrbitEnabled" instead.');
     enableOrbit(payload?.enabled !== false);
     break;
   case 'focusNode':
+    console.warn('[3d-viewer] "focusNode" is deprecated — use "focus" instead.');
     focusNode(payload?.selector, payload?.padding);
     break;
   case 'focusWheel':
+    console.warn('[3d-viewer] "focusWheel" is deprecated — use "focus" with a wheel selector instead.');
     // jetzt animiert statt sofort
     focus('wheel'+(payload?.index||1), payload?.padding || 1.4, payload?.durationMs ?? 800);
     break;
   case 'setWheelVisible':
+    console.warn('[3d-viewer] "setWheelVisible" is deprecated — use "setVisibility" with a wheel selector instead.');
     setVisible('wheel'+(payload?.index||1), payload?.visible !== false);
     break;
   case 'playClip':
+    console.warn('[3d-viewer] "playClip" is not implemented — GLTF animations are not yet supported.');
     break;
   case 'setDebug':
     setDebug(payload);
