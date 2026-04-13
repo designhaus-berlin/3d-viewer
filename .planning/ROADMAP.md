@@ -26,7 +26,10 @@
   2. Die erlaubten Origins sind per URL-Parameter konfigurierbar, sodass ein Host-Entwickler den Viewer ohne Code-Änderung scharf schalten kann
   3. In einer normalen Produktions-Session (kein `?gui=1`) erscheint kein einziges `console.log` im Browser-DevTools, auch nicht bei mehrfachen postMessage-Commands
   4. Bei aktivem Debug-Modus (`?gui=1`) sind Logs weiterhin sichtbar
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 01-01-PLAN.md — Origin allowlist (SEC-01) + production log guard (SEC-02)
 
 ### Phase 2: Dokumentation & Demo
 **Goal**: Entwickler können den Viewer auf GitHub Pages live ausprobieren und per Copy-Paste in ihre Seite einbetten
@@ -69,7 +72,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Security Hardening | 0/? | Not started | - |
+| 1. Security Hardening | 0/1 | Not started | - |
 | 2. Dokumentation & Demo | 0/? | Not started | - |
 | 3. Performance | 0/? | Not started | - |
 | 4. Modularisierung | 0/? | Not started | - |
