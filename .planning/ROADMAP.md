@@ -41,8 +41,12 @@ Plans:
   2. Die Live-Demo auf `designhaus-berlin.github.io/3d-viewer` lädt das AE86-Modell und ist über HTTPS erreichbar; alle Assets (DB UX Fonts, Icons, CSS) werden self-hosted ausgeliefert — kein Request an externe Server
   3. Jedes postMessage-Command (`animateCamera`, `focus`, `setVisibility`, `setOrbitEnabled`, `setAnimationEnabled`) ist in `docs/api.md` mit Parametern, Beispiel und etwaigen Legacy-Deprecation-Hinweisen dokumentiert
   4. Die API-Referenz benennt explizit, welche Legacy-Command-Namen deprecated sind und welcher neue Name zu verwenden ist
-**Plans**: TBD
+**Plans:** 2 plans
 **UI hint**: yes
+
+Plans:
+- [ ] 02-01-PLAN.md — DB UX self-hosting (vendor/db-ux/) + docs/index.html Demo-Seite (DOC-02)
+- [ ] 02-02-PLAN.md — README Quick-Start auf Englisch (DOC-01) + docs/api.md Vollständigkeit (DOC-03)
 
 ### Phase 3: Performance
 **Goal**: Große GLB-Dateien werden zuverlässig geladen; VRAM-Leaks treten nicht auf; der DRACO-Decoder-Stand ist nachvollziehbar dokumentiert
@@ -73,7 +77,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Security Hardening | 0/1 | Not started | - |
-| 2. Dokumentation & Demo | 0/? | Not started | - |
+| 2. Dokumentation & Demo | 0/2 | Not started | - |
 | 3. Performance | 0/? | Not started | - |
 | 4. Modularisierung | 0/? | Not started | - |
 
