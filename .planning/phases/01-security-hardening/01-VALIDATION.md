@@ -41,8 +41,8 @@ created: 2026-04-13
 | 1-01-01 | 01 | 1 | SEC-01 | Cross-origin message from unlisted origin is silently ignored | manual | Open DevTools, send postMessage from different origin, verify no handler executes | ⬜ pending |
 | 1-01-02 | 01 | 1 | SEC-01 | `?allowOrigins=https://example.com` allows that origin, blocks others | manual | Load viewer with param, test from allowed and blocked origins | ⬜ pending |
 | 1-01-03 | 01 | 1 | SEC-01 | No allowOrigins param = same-origin only | manual | Load without param, verify cross-origin message ignored | ⬜ pending |
-| 1-02-01 | 02 | 1 | SEC-02 | No console.log in prod session (no ?gui=1) | manual | Open DevTools Console, send 3 postMessage commands, verify zero log output | ⬜ pending |
-| 1-02-02 | 02 | 1 | SEC-02 | console.log visible with ?gui=1 | manual | Load with ?gui=1, send command, verify log appears | ⬜ pending |
+| 1-01-04 | 01 | 1 | SEC-02 | No console.log in prod session (no ?gui=1) | manual | Open DevTools Console, send 3 postMessage commands, verify zero log output | ⬜ pending |
+| 1-01-05 | 01 | 1 | SEC-02 | console.log visible with ?gui=1 | manual | Load with ?gui=1, send command, verify log appears | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
