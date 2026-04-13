@@ -32,9 +32,10 @@
 **Goal**: Entwickler können den Viewer auf GitHub Pages live ausprobieren und per Copy-Paste in ihre Seite einbetten
 **Depends on**: Phase 1
 **Requirements**: DOC-01, DOC-02, DOC-03
+**UI Stack**: DB UX Design System — `@db-ux/wc-core-components` + `@db-ux/core-foundations`, self-hosted unter `vendor/db-ux/` (kein CDN, Apache-2.0)
 **Success Criteria** (what must be TRUE):
   1. Ein Entwickler, der die GitHub-Repo-Seite aufruft, kann den Embed-Snippet aus der README kopieren, in eine leere HTML-Seite einfügen und hat einen funktionierenden Viewer — ohne weitere Doku zu lesen
-  2. Die Live-Demo auf `designhaus-berlin.github.io/3d-viewer` lädt das AE86-Modell und ist über HTTPS erreichbar
+  2. Die Live-Demo auf `designhaus-berlin.github.io/3d-viewer` lädt das AE86-Modell und ist über HTTPS erreichbar; alle Assets (DB UX Fonts, Icons, CSS) werden self-hosted ausgeliefert — kein Request an externe Server
   3. Jedes postMessage-Command (`animateCamera`, `focus`, `setVisibility`, `setOrbitEnabled`, `setAnimationEnabled`) ist in `docs/api.md` mit Parametern, Beispiel und etwaigen Legacy-Deprecation-Hinweisen dokumentiert
   4. Die API-Referenz benennt explizit, welche Legacy-Command-Namen deprecated sind und welcher neue Name zu verwenden ist
 **Plans**: TBD

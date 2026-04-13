@@ -55,6 +55,7 @@ Der Viewer muss zuverlässig embedden und auf alle API-Commands reagieren — oh
 
 - **Zero-Build**: Keine Transpiler, kein Bundler — direktes ESM, läuft per file:// oder einfachem HTTP-Server
 - **Self-hosted**: Alle Libs lokal unter `vendor/` — kein CDN, offline-fähig
+- **Datenschutz**: Keine Daten an Dritte — keine externen CDNs, keine Analytics, keine Tracking-Pixel; gilt für Viewer UND Demo-Seite
 - **Kein Framework**: Vanilla JS, kein React/Vue/Svelte
 - **Browser-only**: Kein Node.js im Viewer selbst (`serve.js` nur optionaler Dev-Server)
 - **Backwards Compatibility**: Legacy postMessage-API-Aliases müssen während einer Migrationsfrist erhalten bleiben
@@ -68,6 +69,7 @@ Der Viewer muss zuverlässig embedden und auf alle API-Commands reagieren — oh
 | Alles in einer `viewer/index.html` | Einfacher Start, null Konfiguration | ⚠️ Revisit — bei 815 Zeilen Grenze erreicht |
 | `ALLOW_ORIGIN = '*'` | Dev-Convenience | ⚠️ Revisit — Sicherheitsrisiko in Produktion |
 | postMessage als primäre API | Funktioniert cross-origin, framework-agnostisch | ✓ Good |
+| DB UX Design System für Demo-Seite | `@db-ux/wc-core-components` + `@db-ux/core-foundations` (Apache-2.0), Web Components in plain HTML, alle Assets self-hosted unter `vendor/db-ux/` — kein CDN | — Pending |
 
 ## Evolution
 
