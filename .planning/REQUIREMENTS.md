@@ -63,13 +63,26 @@
 
 ## Traceability
 
-| Requirement | Phase |
-|-------------|-------|
-| SEC-01, SEC-02 | Phase 1 — Security Hardening |
-| DOC-01, DOC-02, DOC-03 | Phase 2 — Dokumentation & Demo |
-| PERF-01, PERF-02, PERF-03 | Phase 3 — Performance |
-| MOD-01 – MOD-09 | Phase 4 — Modularisierung |
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| SEC-01 | Phase 1 — Security Hardening | Pending |
+| SEC-02 | Phase 1 — Security Hardening | Pending |
+| DOC-01 | Phase 2 — Dokumentation & Demo | Pending |
+| DOC-02 | Phase 2 — Dokumentation & Demo | Pending |
+| DOC-03 | Phase 2 — Dokumentation & Demo | Pending |
+| PERF-01 | Phase 3 — Performance | Pending |
+| PERF-02 | Phase 3 — Performance | Pending |
+| PERF-03 | Phase 3 — Performance | Pending |
+| MOD-01 | Phase 4 — Modularisierung | Pending |
+| MOD-02 | Phase 4 — Modularisierung | Pending |
+| MOD-03 | Phase 4 — Modularisierung | Pending |
+| MOD-04 | Phase 4 — Modularisierung | Pending |
+| MOD-05 | Phase 4 — Modularisierung | Pending |
+| MOD-06 | Phase 4 — Modularisierung | Pending |
+| MOD-07 | Phase 4 — Modularisierung | Pending |
+| MOD-08 | Phase 4 — Modularisierung | Pending |
+| MOD-09 | Phase 4 — Modularisierung | Pending |
 
 ---
 
-*Last updated: 2026-04-13 after initial requirements definition*
+*Last updated: 2026-04-13 after roadmap creation*
