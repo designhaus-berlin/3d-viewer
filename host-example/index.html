@@ -270,7 +270,7 @@
   <script>
     const iframe = document.getElementById('viewer');
     const info   = document.getElementById('info');
-    const ORIGIN = '*';
+    const ORIGIN = new URL(iframe.src).origin;
 
     function send(type, payload) {
       iframe.contentWindow.postMessage({ type, payload }, ORIGIN);
