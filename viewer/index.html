@@ -55,6 +55,19 @@ import GUI from '../vendor/lil-gui.esm.min.js';
     const theme = url.searchParams.get('theme') || 'dark';
     const lang  = url.searchParams.get('lang')  || 'de';
 
+    // ====== SEC-01: Inbound postMessage Origin Allowlist ======
+    // Konfigurierbar via: ?allowOrigins=https://shop.example.com,https://other.example.com
+    // Ohne ?allowOrigins=: Same-Origin-Nachrichten werden akzeptiert, Cross-Origin ignoriert.
+    const _allowOriginsRaw = url.searchParams.get('allowOrigins');
+    const _allowOrigins = _allowOriginsRaw
+      ? _allowOriginsRaw.split(',').map(o => o.trim()).filter(Boolean)
+      : [];
+
+    function isOriginAllowed(origin) {
+      if (origin === location.origin) return true;  // same-origin immer erlaubt
+      return _allowOrigins.some(allowed => origin === allowed); // nur exakter Match
+    }
+
     // ====== Animation-Konfiguration (Barrierefreiheit) ======
     // Respektiert prefers-reduced-motion; überschreibbar per URL-Param oder Debug-GUI.
     //   ?anim=0  → Animationen deaktiviert
@@ -724,6 +737,7 @@ function setDebug(params){
 }
 
 window.addEventListener('message', (event)=>{
+      if (!isOriginAllowed(event.origin)) return; // SEC-01: unbekannte Origin stillschweigend ablehnen
       const data = event.data || {};
       const { type, payload } = data;
       if (!type) return;
