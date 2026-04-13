@@ -742,7 +742,7 @@ window.addEventListener('message', (event)=>{
       const { type, payload } = data;
       if (!type) return;
       
-console.log('[host→viewer]', type, payload);
+if (showGui) console.log('[host→viewer]', type, payload);
 switch(type){
   // ── Neue API v1 (animiert) ──────────────────────────────────────
   case 'animateCamera':
