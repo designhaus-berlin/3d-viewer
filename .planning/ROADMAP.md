@@ -29,7 +29,7 @@
 **Plans:** 1 plan
 
 Plans:
-- [ ] 01-01-PLAN.md — Origin allowlist (SEC-01) + production log guard (SEC-02)
+- [x] 01-01-PLAN.md — Origin allowlist (SEC-01) + production log guard (SEC-02)
 
 ### Phase 2: Dokumentation & Demo
 **Goal**: Entwickler können den Viewer auf GitHub Pages live ausprobieren und per Copy-Paste in ihre Seite einbetten
@@ -95,6 +95,29 @@ Plans:
 - Wie barrierefrei ist der Viewer aktuell? (ARIA, Keyboard-Navigation, Screenreader)
 - Welches WCAG-Level wird angestrebt?
 - Sollen die Layout-Varianten in `host-example/` oder als eigene Demo-Seiten leben?
+
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote mit /gsd-review-backlog wenn bereit)
+
+### Phase 999.2: Kamerabewegung einschränken bei POI-Auswahl (BACKLOG)
+
+**Goal:** Nach der Auswahl eines Objekts/POI kann der User die Kamera nur noch in einem begrenzten Bereich (~15° pro Achse) um das Target bewegen — nicht mehr frei orbital. Die Einschränkung soll per postMessage ein- und ausschaltbar sein.
+
+**Kontext:** Wenn ein POI fokussiert ist, soll der Nutzer das Objekt noch leicht aus verschiedenen Winkeln betrachten können, aber nicht unkontrolliert wegnavigieren. Das Feature ergänzt `setOrbitConstraints` (bereits vorhanden) um eine POI-spezifische Auto-Constraint-Logik.
+
+**Technische Hinweise:**
+- `setOrbitConstraints` existiert bereits in der postMessage-API (azimuthMin/Max, polarMin/Max, distanceMin/Max, reset?)
+- Beim `focus`-Command könnte automatisch ein Constraint-Fenster (~15°) um die aktuelle Kameraposition gesetzt werden
+- Toggle: neuer postMessage-Command oder Parameter an `focus` (z.B. `lockOrbit: true/false`)
+- `arcCfg` und `tweenToken` wären beim Implementieren zu berücksichtigen
+
+**Offene Fragen:**
+- Soll die Einschränkung automatisch beim `focus`-Command greifen (opt-in via Parameter)?
+- Sollen die 15° konfigurierbar sein (per Command oder URL-Param)?
+- Soll beim Verlassen des POI (z.B. `setOrbitConstraints reset`) die freie Orbit wieder hergestellt werden?
 
 **Requirements:** TBD
 **Plans:** 0 plans
