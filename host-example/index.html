@@ -1,0 +1,443 @@
+
+<!doctype html>
+<html lang="de" data-color-scheme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3D Viewer – Demo</title>
+
+  <!-- DB UX Design System v3 via CDN -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@db-ux/core-foundations@4.5.0/build/styles/rollup.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@db-ux/core-components@4.5.0/build/styles/rollup.css">
+
+  <style>
+    /* ── Layout ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      background: var(--db-color-background, #f3f4f6);
+      font-family: var(--db-font-family-head, system-ui, sans-serif);
+      color: var(--db-color-on-background, #1a1f2e);
+    }
+
+    /* ── Header ─────────────────────────────────────────────────── */
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--db-color-on-background-container-outline, #d8dde8);
+      background: var(--db-color-background-container, #ffffff);
+    }
+    .app-header h1 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      flex: 1;
+      white-space: nowrap;
+    }
+    .header-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    /* ── Main: Viewer + Seitenleiste ─────────────────────────────── */
+    .app-body {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      overflow: hidden;
+    }
+
+    /* ── Viewer ──────────────────────────────────────────────────── */
+    .viewer-wrap {
+      position: relative;
+      background: #e4e7ec;
+    }
+    .viewer-wrap iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    /* ── Seitenleiste ────────────────────────────────────────────── */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--db-color-on-background-container-outline, #d8dde8);
+      background: var(--db-color-background-container, #ffffff);
+      overflow-y: auto;
+    }
+    .sidebar-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--db-color-on-background-container-outline, #d8dde8);
+    }
+    .sidebar-header h2 {
+      margin: 0;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      opacity: 0.45;
+    }
+    .sidebar-content {
+      padding: 12px;
+      flex: 1;
+    }
+
+    /* ── Status-Info ─────────────────────────────────────────────── */
+    #info {
+      padding: 10px 16px;
+      border-top: 1px solid var(--db-color-on-background-container-outline, #d8dde8);
+      font-size: 0.82rem;
+      color: var(--db-color-on-background-container, #6b7a99);
+      min-height: 40px;
+    }
+    #info strong { color: var(--db-color-on-background, #1a1f2e); }
+
+    /* ── Accordion: Light-Mode-Overrides ────────────────────────── */
+    /* DB UX Komponenten-CSS ignoriert data-color-scheme bei card-Variante;
+       Farben daher direkt überschreiben. */
+    .db-accordion,
+    .db-accordion-item,
+    .db-accordion-item details,
+    .db-accordion-item details > summary {
+      background-color: #ffffff !important;
+      color: #1a1f2e !important;
+    }
+    .db-accordion-item details > summary:hover {
+      background-color: #f3f4f6 !important;
+    }
+    .db-accordion-item details[open] > summary {
+      color: #ec0016 !important;
+    }
+    .db-accordion-item details > div {
+      background-color: #ffffff !important;
+      color: #3d4a5c !important;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      padding: 4px 0 8px;
+    }
+
+    /* ── Chevron-Fallback (Icon-Font lädt nicht vom CDN) ─────────── */
+    .db-accordion-item details > summary::after {
+      font-family: system-ui, sans-serif !important;
+      content: "▾" !important;
+      font-size: 1.1em;
+      display: inline-block;
+      transition: transform 0.2s ease;
+      color: #1a1f2e !important;
+    }
+    .db-accordion-item details[open] > summary::after {
+      transform: rotate(-180deg);
+      color: #ec0016 !important;
+    }
+
+    /* Hover-State des ganzen Items */
+    .db-accordion-item {
+      cursor: pointer;
+    }
+
+    /* ── Responsive: unter 700px gestapelt ──────────────────────── */
+    @media (max-width: 700px) {
+      .app-body {
+        grid-template-columns: 1fr;
+        grid-template-rows: 60vw 1fr;
+      }
+      .sidebar {
+        border-left: none;
+        border-top: 1px solid var(--db-color-on-background-container-outline, #d8dde8);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────────────── -->
+  <header class="app-header">
+    <h1>3D Viewer</h1>
+    <div class="header-actions">
+      <button class="db-button" id="resetCam" data-size="small" data-variant="ghost">↺ Übersicht</button>
+      <button class="db-button" id="toggleOrbit" data-size="small" data-variant="ghost">Orbit</button>
+    </div>
+  </header>
+
+  <!-- ── Hauptbereich ─────────────────────────────────────────────── -->
+  <div class="app-body">
+
+    <!-- 3D Viewer (iframe) -->
+    <div class="viewer-wrap">
+      <iframe id="viewer"
+        src="../viewer/index.html?theme=light&lang=de&model=../assets/260302_Dresden-Cotta_gesamt.glb&gui=1&canvasHover=0&camMinY=5&camMaxY=170"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin allow-pointer-lock allow-popups"
+        allow="xr-spatial-tracking; fullscreen">
+      </iframe>
+    </div>
+
+    <!-- Seitenleiste mit Accordion -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Bauteile</h2>
+      </div>
+
+      <div class="sidebar-content">
+        <div class="db-accordion" data-variant="card">
+
+          <div class="db-accordion-item" data-selector="Gebäude">
+            <details>
+              <summary>Gebäude</summary>
+              <div><p>Gesamtbestand der Gebäude im Plangebiet Dresden-Cotta. 453 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="Brücke">
+            <details>
+              <summary>Brücke</summary>
+              <div><p>Brückenbauwerk im Plangebiet. 55 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="Straße">
+            <details>
+              <summary>Straße</summary>
+              <div><p>Straßenflächen und Fahrbahnen im Plangebiet. 23 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="Vorplatz">
+            <details>
+              <summary>Vorplatz</summary>
+              <div><p>Vorplatzbereiche und Freiflächen. 23 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="Mittelinsel">
+            <details>
+              <summary>Mittelinsel</summary>
+              <div><p>Mittelinseln der Straßenkreuzungen. 3 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="Straßenbahnhaltestelle">
+            <details>
+              <summary>Straßenbahnhaltestelle</summary>
+              <div><p>Haltestellen des ÖPNV im Plangebiet. 6 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="Straßenbemalung">
+            <details>
+              <summary>Straßenbemalung</summary>
+              <div><p>Markierungen und Bodenbemalungen auf Fahrbahnen und Gehwegen. 151 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="lärmschutzwand">
+            <details>
+              <summary>Lärmschutzwand</summary>
+              <div><p>Schallschutzwände entlang der Verkehrsachsen. 25 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="Laternen">
+            <details>
+              <summary>Laternen</summary>
+              <div><p>Straßenbeleuchtung im Plangebiet. 11 Objekte.</p></div>
+            </details>
+          </div>
+
+          <div class="db-accordion-item" data-selector="DVB_Masten">
+            <details>
+              <summary>DVB-Masten</summary>
+              <div><p>Oberleitungsmasten der Dresdner Verkehrsbetriebe. 27 Objekte.</p></div>
+            </details>
+          </div>
+
+        </div>
+      </div>
+
+      <div id="info">Viewer lädt …</div>
+    </aside>
+
+  </div><!-- /.app-body -->
+
+  <script>
+    const iframe = document.getElementById('viewer');
+    const info   = document.getElementById('info');
+    const ORIGIN = '*';
+
+    function send(type, payload) {
+      iframe.contentWindow.postMessage({ type, payload }, ORIGIN);
+    }
+
+    function focusElement(selector, padding = 1.6, durationMs = 1000) {
+      send('focus', { selector, padding, durationMs });
+    }
+
+    function resetCamera() {
+      send('focus', { selector: 'all', padding: 1.35, durationMs: 1200 });
+      send('setOrbitConstraints', { reset: true });
+    }
+
+    // ── Hilfsfunktionen ───────────────────────────────────────────
+
+    // "x,y,z" → { x, y, z } oder null
+    function parseTriplet(str) {
+      if (!str) return null;
+      const [x, y, z] = str.split(',').map(Number);
+      return (isFinite(x) && isFinite(y) && isFinite(z)) ? { x, y, z } : null;
+    }
+
+    // Orbit-Beschränkungen für ein Accordion-Item anwenden.
+    // Wird nach der Kamera-Animation aufgerufen (setTimeout = durationMs + 150ms).
+    //
+    // Unterstützte data-*-Attribute:
+    //   data-cam-pos="x,y,z"    Exakte Kameraposition (aus Debug-GUI "Copy as URL")
+    //   data-cam-tar="x,y,z"    Blickpunkt (optional – Standard: Objekt-Mitte)
+    //   data-orbit-h="30"       ±Grad horizontale Freiheit (Azimut)
+    //   data-orbit-v="20"       ±Grad vertikale Freiheit (Polar)
+    //   data-zoom-min="10"      Minimaler Kameraabstand
+    //   data-zoom-max="150"     Maximaler Kameraabstand
+    function applyConstraints(item, durationMs) {
+      const camPos  = parseTriplet(item.dataset.camPos);
+      const orbitH  = parseFloat(item.dataset.orbitH  || '0');
+      const orbitV  = parseFloat(item.dataset.orbitV  || '0');
+      const zoomMin = parseFloat(item.dataset.zoomMin || '0');
+      const zoomMax = parseFloat(item.dataset.zoomMax || '0');
+
+      const hasConstraints = orbitH > 0 || orbitV > 0 || zoomMin > 0 || zoomMax > 0;
+      if (!hasConstraints) return;
+
+      setTimeout(() => {
+        const constraints = {};
+
+        if (camPos && (orbitH > 0 || orbitV > 0)) {
+          const camTar = parseTriplet(item.dataset.camTar) || { x: 0, y: 0, z: 0 };
+          const off = { x: camPos.x - camTar.x, y: camPos.y - camTar.y, z: camPos.z - camTar.z };
+          const r   = Math.sqrt(off.x ** 2 + off.y ** 2 + off.z ** 2);
+
+          if (orbitH > 0) {
+            const az = Math.atan2(off.x, off.z) * 180 / Math.PI;
+            constraints.azimuthMin = az - orbitH;
+            constraints.azimuthMax = az + orbitH;
+          }
+          if (orbitV > 0 && r > 0) {
+            const pol = Math.acos(Math.max(-1, Math.min(1, off.y / r))) * 180 / Math.PI;
+            constraints.polarMin = Math.max(1,   pol - orbitV);
+            constraints.polarMax = Math.min(179, pol + orbitV);
+          }
+        }
+
+        if (zoomMin > 0) constraints.distanceMin = zoomMin;
+        if (zoomMax > 0) constraints.distanceMax = zoomMax;
+
+        if (Object.keys(constraints).length > 0) send('setOrbitConstraints', constraints);
+      }, durationMs + 150);
+    }
+
+    // ── Accordion: Verhalten ──────────────────────────────────────
+    // Nur ein Item gleichzeitig offen; bei Öffnen Kamera hinfahren.
+    const accordionItems = document.querySelectorAll('.db-accordion-item');
+
+    accordionItems.forEach(item => {
+      const details  = item.querySelector('details');
+      const selector = item.dataset.selector;
+
+      // Toggle: bei Öffnen → andere schließen + Kamera
+      details.addEventListener('toggle', () => {
+        if (details.open) {
+          accordionItems.forEach(other => {
+            if (other !== item) other.querySelector('details').open = false;
+          });
+
+          if (selector) {
+            const camPos = parseTriplet(item.dataset.camPos);
+            const camTar = parseTriplet(item.dataset.camTar);
+            const dur    = 1000;
+            if (camPos) {
+              // Exakte Kameraposition aus data-cam-pos / data-cam-tar
+              send('focus', {
+                selector,
+                position:   camPos,
+                target:     camTar || undefined,
+                durationMs: dur,
+              });
+            } else {
+              // Automatisch anhand Bounding-Box
+              focusElement(selector, parseFloat(item.dataset.padding || '1.6'), dur);
+            }
+            applyConstraints(item, dur);
+          }
+        } else {
+          // Item geschlossen → Constraints zurücksetzen
+          send('setOrbitConstraints', { reset: true });
+        }
+      });
+
+      // Hover → 3D-Element hervorheben
+      if (selector) {
+        item.addEventListener('mouseenter', () => send('setHover', { selector }));
+        item.addEventListener('mouseleave', () => send('setHover', { selector: null }));
+      }
+    });
+
+    // ── Header-Buttons ────────────────────────────────────────────
+    document.getElementById('resetCam').addEventListener('click', resetCamera);
+
+    let orbitOn = true;
+    document.getElementById('toggleOrbit').addEventListener('click', () => {
+      orbitOn = !orbitOn;
+      send('setOrbitEnabled', { enabled: orbitOn });
+      document.getElementById('toggleOrbit').textContent = orbitOn ? 'Orbit' : 'Orbit (aus)';
+    });
+
+    // ── Viewer → Host Events ──────────────────────────────────────
+    window.addEventListener('message', ev => {
+      const d = ev.data || {};
+      if (d.source !== 'viewer') return;
+
+      switch (d.type) {
+        case 'ready':
+          info.innerHTML = '<strong>Bereit</strong> – Element anklicken oder Accordion öffnen.';
+          break;
+
+        case 'loading':
+          info.innerHTML = `Lädt … <strong>${Math.round((d.payload?.progress || 0) * 100)}%</strong>`;
+          break;
+
+        case 'poi': {
+          // Klick im 3D-Viewer → passendes Accordion-Item öffnen
+          const id = d.payload?.id || d.payload?.name || '';
+          info.innerHTML = `Angeklickt: <strong>${id}</strong>`;
+          send('focus', { selector: id, padding: 1.5, durationMs: 900 });
+
+          // Accordion-Item mit passendem data-selector öffnen
+          accordionItems.forEach(item => {
+            const details = item.querySelector('details');
+            if (item.dataset.selector === id) {
+              details.open = true;
+            } else {
+              details.open = false;
+            }
+          });
+          break;
+        }
+
+        case 'aliases':
+          console.log('[Aliases]', d.payload?.mapped);
+          break;
+
+        case 'error':
+          info.innerHTML = `<strong style="color:#f87">Fehler:</strong> ${d.payload?.message || 'Unbekannt'}`;
+          break;
+      }
+    });
+  </script>
+</body>
+</html>

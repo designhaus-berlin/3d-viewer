@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+
+# Logs
+*.log
+
+# Large assets (too big for GitHub)
+assets/260302_Dresden-Cotta_gesamt.glb

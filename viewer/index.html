@@ -1,0 +1,815 @@
+
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3D Viewer (iFrame App)</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0f1115; color: #e6e8ee; font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #app { position: fixed; inset: 0; display: grid; grid-template-rows: 1fr auto; }
+    #canvasWrap { position: relative; }
+    #progress { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,.5); padding: 6px 10px; border-radius: 8px; }
+    #hud { display:flex; gap:12px; align-items:center; padding:10px; background:#0c0e12; border-top:1px solid #191c22; }
+    .tag { opacity:.8; font-size:12px; }
+    button { background:#1a1f29; color:#e6e8ee; border:1px solid #283041; padding:8px 10px; border-radius:8px; cursor:pointer; }
+    button:hover { background:#212836; }
+  </style>
+
+  <!-- Import Map: lokal gehostet (self-hosted, kein CDN) -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "../vendor/three.module.min.js",
+      "three/addons/": "../vendor/addons/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div id="canvasWrap">
+      <div id="progress" hidden>Lädt … 0%</div>
+    </div>
+    <div id="hud">
+      <span class="tag">Viewer v1 • Three.js</span>
+      <div style="flex:1"></div>
+      <button id="btnOrbit">Orbit an/aus</button>
+      <button id="btnBounds">Debug-Bounds</button>
+    </div>
+  </div>
+
+  <script type="module">
+    // ====== Three.js laden über Import Map ======
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+    import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import GUI from '../vendor/lil-gui.esm.min.js';
+
+    // ====== Hilfsfunktionen ======
+    const $ = (sel, el=document) => el.querySelector(sel);
+    const url = new URL(location.href);
+    const modelUrl = url.searchParams.get('model');   // Wenn null, wird ein Demo-Modell erzeugt
+    const theme = url.searchParams.get('theme') || 'dark';
+    const lang  = url.searchParams.get('lang')  || 'de';
+
+    // ====== Animation-Konfiguration (Barrierefreiheit) ======
+    // Respektiert prefers-reduced-motion; überschreibbar per URL-Param oder Debug-GUI.
+    //   ?anim=0  → Animationen deaktiviert
+    const _reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animCfg = {
+      enabled: url.searchParams.has('anim')
+        ? url.searchParams.get('anim') !== '0'
+        : !_reducedMotion,
+    };
+
+    // ====== Arc-Kamerafahrt Konfiguration ======
+    // Alle Werte live per Debug-GUI oder per URL-Param anpassbar:
+    //   ?arcLift=0.4  → Bogenhöhe pro Radiant Winkel   (0=flach, 1=steil)
+    //   ?arcMax=1.0   → Max. Bogenhöhe in Radiant       (1.0 ≈ 57°)
+    //   ?arcSafe=0.0  → BoundingSphere-Faktor für Min-Radius (0=aus, 0.85=kompakt)
+    const arcCfg = {
+      liftFactor: parseFloat(url.searchParams.get('arcLift') || '0.4'),
+      liftMax:    parseFloat(url.searchParams.get('arcMax')  || '1.0'),
+      safeRadius: parseFloat(url.searchParams.get('arcSafe') || '0.0'),
+    };
+
+    // ====== Kamera-Höhenbeschränkung (world-space Y) ======
+    // ?camMinY=5   → Kamera bleibt mindestens auf dieser Y-Höhe
+    // ?camMaxY=170 → Kamera überschreitet diesen Y-Wert nicht
+    const camMinY = url.searchParams.has('camMinY') ? parseFloat(url.searchParams.get('camMinY')) : -Infinity;
+    const camMaxY = url.searchParams.has('camMaxY') ? parseFloat(url.searchParams.get('camMaxY')) : Infinity;
+
+    // ====== Three.js Grundaufbau ======
+    const wrap = $('#canvasWrap');
+    const progressEl = $('#progress');
+
+    const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    wrap.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(theme === 'light' ? 0xe4e7ec : 0x0f1115);
+
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 5000);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    
+// robustes Resize: clamped, keine Feedback-Schleife
+function applySize(){
+  const rect = wrap.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width || innerWidth));
+  const h = Math.max(1, Math.floor(rect.height || (innerHeight - 48)));
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // true => passt auch die CSS-Größe an (vermeidet Mismatch/Warnings)
+  renderer.setSize(w, h, true);
+}
+window.addEventListener('resize', ()=> requestAnimationFrame(applySize), { passive:true });
+// initial
+applySize();
+
+
+
+// ====== Debug-UI (lil-gui), per ?gui=1 oder ?debug=gui ======
+const showGui = /(^|&)gui=1(&|$)/.test(location.search) || /(^|&)debug=gui(&|$)/.test(location.search);
+if (showGui) {
+  const gui = new GUI({ title: 'Viewer Debug' });
+  const state = {
+    camPosX: camera.position.x, camPosY: camera.position.y, camPosZ: camera.position.z,
+    tarX: controls.target.x, tarY: controls.target.y, tarZ: controls.target.z,
+    fov: camera.fov,
+    orbitEnabled: controls.enabled,
+    damping: controls.enableDamping,
+    bounds: false,
+  };
+
+  function syncFromCamera() {
+    state.camPosX = camera.position.x; state.camPosY = camera.position.y; state.camPosZ = camera.position.z;
+    state.tarX = controls.target.x; state.tarY = controls.target.y; state.tarZ = controls.target.z;
+    state.fov = camera.fov;
+    gui.controllersRecursive().forEach(c => c.updateDisplay && c.updateDisplay());
+  }
+
+  const fCam = gui.addFolder('Camera');
+  fCam.add(state, 'camPosX').name('pos.x').onFinishChange(v => { camera.position.x = +v; controls.update(); });
+  fCam.add(state, 'camPosY').name('pos.y').onFinishChange(v => { camera.position.y = +v; controls.update(); });
+  fCam.add(state, 'camPosZ').name('pos.z').onFinishChange(v => { camera.position.z = +v; controls.update(); });
+  fCam.add(state, 'tarX').name('target.x').onFinishChange(v => { controls.target.x = +v; controls.update(); });
+  fCam.add(state, 'tarY').name('target.y').onFinishChange(v => { controls.target.y = +v; controls.update(); });
+  fCam.add(state, 'tarZ').name('target.z').onFinishChange(v => { controls.target.z = +v; controls.update(); });
+  fCam.add(state, 'fov', 10, 100, 1).name('FOV').onChange(v => { camera.fov = +v; camera.updateProjectionMatrix(); });
+  fCam.open();
+
+  const fCtl = gui.addFolder('Controls & Debug');
+  fCtl.add(state, 'orbitEnabled').name('Orbit enabled').onChange(v => { controls.enabled = !!v; });
+  fCtl.add(state, 'damping').name('Damping').onChange(v => { controls.enableDamping = !!v; });
+  fCtl.add(state, 'bounds').name('Show bounds').onChange(v => setDebug({ bounds: !!v }));
+  fCtl.add(animCfg, 'enabled').name('Animationen').onChange(v => {
+    post({ type: 'animationEnabled', payload: { enabled: !!v } });
+  });
+  fCtl.open();
+
+  const actions = {
+    copyCameraJSON(){
+      const payload = {
+        position: { x: round(camera.position.x), y: round(camera.position.y), z: round(camera.position.z) },
+        target:   { x: round(controls.target.x), y: round(controls.target.y), z: round(controls.target.z) },
+        fov: round(camera.fov)
+      };
+      const text = JSON.stringify(payload, null, 2);
+      copy(text, 'Kamera als JSON kopiert:', text);
+    },
+    copyAsURLParams(){
+      const params = new URLSearchParams(location.search);
+      params.set('camPos', `${round(camera.position.x)},${round(camera.position.y)},${round(camera.position.z)}`);
+      params.set('camTar', `${round(controls.target.x)},${round(controls.target.y)},${round(controls.target.z)}`);
+      params.set('fov', String(round(camera.fov)));
+      const url = `${location.origin}${location.pathname}?${params.toString()}`;
+      copy(url, 'URL mit Kamera-Parametern kopiert:', url);
+    },
+    resetCamera(){
+      if (root) frameObject(root, 1.35); else controls.update();
+      syncFromCamera();
+    },
+    copyButtonJS(){
+      const p = camera.position, t = controls.target;
+      const snippet =
+`document.getElementById('VIEW_ID').addEventListener('click', () =>
+  send('animateCamera', {
+    position:   { x: ${round(p.x)}, y: ${round(p.y)}, z: ${round(p.z)} },
+    target:     { x: ${round(t.x)}, y: ${round(t.y)}, z: ${round(t.z)} },
+    durationMs: 1200
+  })
+);`;
+      copy(snippet, '📋 Button-JS kopiert:', snippet);
+    }
+  };
+  const fAct = gui.addFolder('Actions');
+  fAct.add(actions, 'copyCameraJSON').name('📋 Copy camera JSON');
+  fAct.add(actions, 'copyAsURLParams').name('🔗 Copy as URL');
+  fAct.add(actions, 'resetCamera').name('↺ Reset camera');
+  fAct.add(actions, 'copyButtonJS').name('🔲 Copy Button JS');
+
+  // Arc-Kamerafahrt Tuning — live anpassbar, auch per URL-Param
+  const fArc = gui.addFolder('Arc Camera');
+  fArc.add(arcCfg, 'liftFactor', 0, 1,        0.05).name('Lift-Faktor  (0=flach)');
+  fArc.add(arcCfg, 'liftMax',   0, Math.PI,   0.05).name('Lift-Max rad (1.0≈57°)');
+  fArc.add(arcCfg, 'safeRadius',0, 1.5,       0.05).name('Safe Radius  (0=aus)');
+  fArc.close();
+
+  function copy(text, logPrefix, logValue){
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(()=> console.log(logPrefix, logValue))
+      .catch(()=> console.log('Clipboard fehlgeschlagen, siehe Konsole:', text));
+    } else {
+      console.log(logPrefix, logValue);
+    }
+  }
+  const round = (n)=> Math.round((+n + Number.EPSILON) * 1000) / 1000;
+
+  // Laufende Synchronisierung beim Render
+  const _render = renderer.render.bind(renderer);
+  renderer.render = (sc, cam) => { syncFromCamera(); _render(sc, cam); };
+
+  // Optionale Start-Kameraparameter aus URL
+  try {
+    const sp = new URLSearchParams(location.search);
+    const cp = sp.get('camPos'); const ct = sp.get('camTar'); const f = sp.get('fov');
+    if (cp) { const [x,y,z] = cp.split(',').map(Number); if (x!=null && y!=null && z!=null) camera.position.set(x,y,z); }
+    if (ct) { const [tx,ty,tz] = ct.split(',').map(Number); if (tx!=null && ty!=null && tz!=null) controls.target.set(tx,ty,tz); }
+    if (f)  { camera.fov = Number(f); camera.updateProjectionMatrix(); }
+    controls.update();
+  } catch(e){ /* ignore */ }
+}
+
+
+    // Licht
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.0); dir.position.set(10,20,10); scene.add(dir);
+
+    // Animation loop
+    const clock = new THREE.Clock();
+    function loop(){
+      requestAnimationFrame(loop);
+      controls.update();
+      // Y-Höhenbeschränkung anwenden
+      if (isFinite(camMinY) || isFinite(camMaxY)) {
+        const clamped = Math.max(isFinite(camMinY) ? camMinY : -1e9,
+                          Math.min(isFinite(camMaxY) ? camMaxY : 1e9, camera.position.y));
+        if (camera.position.y !== clamped) {
+          camera.position.y = clamped;
+          controls.update();
+        }
+      }
+      renderer.render(scene, camera);
+    }
+    loop();
+
+    // ====== Model laden oder Demo erstellen ======
+    let root = null;
+
+    async function loadModel(url){
+      progressEl.hidden = false;
+      progressEl.textContent = 'Lädt … 0%';
+      const loader = new GLTFLoader();
+      const draco = new DRACOLoader();
+      draco.setDecoderPath('../vendor/addons/libs/draco/');
+      loader.setDRACOLoader(draco);
+      const ktx2 = new KTX2Loader().setTranscoderPath('../vendor/addons/libs/basis/');
+      ktx2.detectSupport(renderer); loader.setKTX2Loader(ktx2);
+
+      loader.manager.onProgress = (url, loaded, total)=>{
+        const pct = Math.round((loaded/Math.max(total,1))*100);
+        progressEl.textContent = `Lädt … ${pct}%`;
+        post({type:'loading', payload:{progress: Math.min(1, loaded/Math.max(total,1))}});
+      };
+
+      try{
+        const gltf = await loader.loadAsync(url);
+        root = gltf.scene;
+        scene.add(root);
+        detectWheels(root);
+        frameObject(root, 1.35);
+        progressEl.hidden = true;
+      }catch(err){
+        progressEl.textContent = 'Fehler beim Laden';
+        post({type:'error', payload:{code:'MODEL_LOAD', message: String(err)}});
+      }
+    }
+
+    function createDemoModel(){
+      // Demo-„Brücke“ mit drei Teilen und stabilen IDs/Tags
+      root = new THREE.Group(); root.name = 'demoBridge';
+
+      const matA = new THREE.MeshStandardMaterial({ color: 0x8899aa, metalness:0.1, roughness:0.8 });
+      const matB = new THREE.MeshStandardMaterial({ color: 0x97a6b9, metalness:0.1, roughness:0.7 });
+      const matC = new THREE.MeshStandardMaterial({ color: 0x708399, metalness:0.2, roughness:0.6 });
+
+      const pfeilerL = new THREE.Mesh(new THREE.BoxGeometry(1,6,1), matA);
+      pfeilerL.position.set(-5,3,0); pfeilerL.name = 'Pfeiler_L'; pfeilerL.userData = { id:'pfeiler_L', tag:'pfeiler' };
+      const pfeilerR = new THREE.Mesh(new THREE.BoxGeometry(1,6,1), matA);
+      pfeilerR.position.set(5,3,0); pfeilerR.name = 'Pfeiler_R'; pfeilerR.userData = { id:'pfeiler_R', tag:'pfeiler' };
+      const tragwerk = new THREE.Mesh(new THREE.BoxGeometry(12,0.6,2), matB);
+      tragwerk.position.set(0,6,0); tragwerk.name = 'Tragwerk'; tragwerk.userData = { id:'tragwerk', tag:'tragwerk' };
+      const seil = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,12,12), matC);
+      seil.rotation.z = Math.PI/2; seil.position.set(0,8,0); seil.name='Seil'; seil.userData = { id:'seil', tag:'seil' };
+
+      root.add(pfeilerL, pfeilerR, tragwerk, seil);
+      scene.add(root);
+      detectWheels(root);
+      frameObject(root, 1.45);
+    }
+
+    function frameObject(object3D, offset=1.2) {
+      const box = new THREE.Box3().setFromObject(object3D);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const dist = (maxDim / (2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)))) * offset;
+      const dirVec = new THREE.Vector3(1, 0.6, 1).normalize();
+      camera.position.copy(center.clone().add(dirVec.multiplyScalar(dist)));
+      controls.target.copy(center);
+      controls.update();
+    }
+
+    if (modelUrl) loadModel(modelUrl); else createDemoModel();
+
+
+// ====== Auto-Detection: Wheels (heuristisch) ======
+const aliases = new Map(); // e.g., 'wheel1' -> Object3D
+function detectWheels(rootObj){
+  // Kandidaten: Nodes mit passenden Namen/Tags (nicht nur Meshes)
+  const re = /(wheel|tire|tyre|rim|felge|rad|reifen)/i;
+  const candidates = [];
+  rootObj.traverse(o=>{
+    const tag = (o.userData?.id || o.userData?.tag || o.name || '').toString();
+    if (re.test(tag)) {
+      const pos = new THREE.Vector3();
+      o.getWorldPosition(pos);
+      candidates.push({o,pos});
+    }
+  });
+  if (candidates.length === 0) return;
+
+  // Bounding Box des gesamten Modells
+  const box = new THREE.Box3().setFromObject(rootObj);
+  const min = box.min, max = box.max;
+
+  // definieren 4 "Eckpunkte" in x/z (y ignorieren)
+  const corners = [
+    { name:'wheel1', x:min.x, z:max.z }, // vorne links (angenommen)
+    { name:'wheel2', x:max.x, z:max.z }, // vorne rechts
+    { name:'wheel3', x:min.x, z:min.z }, // hinten links
+    { name:'wheel4', x:max.x, z:min.z }  // hinten rechts
+  ];
+
+  // Für jede Ecke den nächsten Kandidaten suchen
+  function dist2(a,b){ const dx=a.x-b.x, dz=a.z-b.z; return dx*dx+dz*dz; }
+  const used = new Set();
+  corners.forEach(c=>{
+    let best=null, bestD=Infinity;
+    candidates.forEach(({o,pos},idx)=>{
+      if (used.has(idx)) return;
+      const d = dist2(pos, c);
+      if (d < bestD){ bestD = d; best = {o,idx}; }
+    });
+    if (best){ used.add(best.idx); aliases.set(c.name, best.o); }
+  });
+  // Host informieren (Diagnose)
+  const mapped = {};
+  aliases.forEach((obj,key)=>{ mapped[key] = obj.name || obj.userData?.id || '(unnamed)'; });
+  post({type:'aliases', payload:{ mapped, candidates:candidates.map(c=>c.o.name) }});
+}
+
+// erweitere setVisible & focusNode um Alias-Resolver
+function resolveSelector(sel){
+  if (!sel) return null;
+  if (aliases.has(sel)) return aliases.get(sel);
+  // direkter Name/ID/Tag: finde Objekt (beliebiger Node)
+  let found = null;
+  root?.traverse(o=>{
+    if (found) return;
+    if (o.name===sel || o.userData?.id===sel || o.userData?.tag===sel) found = o;
+  });
+  return found;
+}
+
+
+    // ====== Picking (POIs) + Hover-Highlight ======
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    // Hover-State: aktuell hervorgehobenes Mesh + gesichertes Original-Emissive
+    let _hoveredMesh = null;
+    const _origEmissive = new THREE.Color();
+
+    function _applyHover(mesh){
+      if (_hoveredMesh === mesh) return;
+      _clearHover();
+      if (!mesh) return;
+      // Material ggf. klonen damit andere Meshes mit gleichem Material unberührt bleiben
+      if (!mesh.userData._matCloned) {
+        mesh.material = mesh.material.clone();
+        mesh.userData._matCloned = true;
+      }
+      _origEmissive.copy(mesh.material.emissive);
+      mesh.material.emissive.set(0x666666); // helles Aufleuchten
+      mesh.material.emissiveIntensity = 1;
+      _hoveredMesh = mesh;
+      renderer.domElement.style.cursor = 'pointer';
+    }
+
+    function _clearHover(){
+      if (!_hoveredMesh) return;
+      _hoveredMesh.material.emissive.copy(_origEmissive);
+      _hoveredMesh = null;
+      renderer.domElement.style.cursor = 'default';
+    }
+
+    // Hover via pointermove (gedrosselt auf rAF-Takt)
+    // Deaktivierbar per URL-Param ?canvasHover=0 — nützlich wenn der Host
+    // das Highlighting ausschließlich über setHover (Accordion/Buttons) steuert.
+    const canvasHoverEnabled = url.searchParams.get('canvasHover') !== '0';
+    if (canvasHoverEnabled) {
+      let _hoverScheduled = false;
+      renderer.domElement.addEventListener('pointermove', e => {
+        if (_hoverScheduled) return;
+        _hoverScheduled = true;
+        requestAnimationFrame(() => {
+          _hoverScheduled = false;
+          if (!root) return;
+          const rect = renderer.domElement.getBoundingClientRect();
+          pointer.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
+          pointer.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
+          raycaster.setFromCamera(pointer, camera);
+          const objs = [];
+          root.traverse(o => { if (o.isMesh && o.visible) objs.push(o); });
+          const hit = raycaster.intersectObjects(objs, true)[0];
+          _applyHover(hit ? hit.object : null);
+        });
+      });
+      renderer.domElement.addEventListener('pointerleave', _clearHover);
+    }
+
+    // ── Externer Hover (ausgelöst vom Host per setHover-API) ──────────
+    // Hebt alle Meshes eines resolvierten Selektors hervor (Farbe: Blau-Akzent).
+    // Getrennt vom canvas-internen Hover, damit sich beide nicht gegenseitig stören.
+    const _extOrigEmissives = new Map();
+    let _extHoveredMeshes = [];
+
+    function _applyExternalHover(selector) {
+      _clearExternalHover();
+      if (!selector || !root) return;
+      const obj = resolveSelector(selector);
+      if (!obj) return;
+      obj.traverse(o => {
+        if (!o.isMesh || !o.visible) return;
+        if (!o.userData._matCloned) {
+          o.material = o.material.clone();
+          o.userData._matCloned = true;
+        }
+        _extOrigEmissives.set(o, o.material.emissive.clone());
+        o.material.emissive.set(0x334488);
+        o.material.emissiveIntensity = 1;
+        _extHoveredMeshes.push(o);
+      });
+    }
+
+    function _clearExternalHover() {
+      _extHoveredMeshes.forEach(mesh => {
+        const orig = _extOrigEmissives.get(mesh);
+        if (orig) mesh.material.emissive.copy(orig);
+        _extOrigEmissives.delete(mesh);
+      });
+      _extHoveredMeshes = [];
+    }
+
+    renderer.domElement.addEventListener('pointerdown', onPick);
+
+    function onPick(e){
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.x = ((e.clientX-rect.left)/rect.width)*2 - 1;
+      pointer.y = -((e.clientY-rect.top)/rect.height)*2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+      const objs = []; root && root.traverse(o=>{ if (o.isMesh) objs.push(o); });
+      const hit = raycaster.intersectObjects(objs, true)[0];
+      if (!hit) return;
+      const m = hit.object;
+      const id = m.userData?.id || m.userData?.tag || m.name;
+      post({type:'poi', payload:{ id, name:m.name }});
+    }
+
+    
+// ====== Tween/Animation (ohne externe Lib) ======
+// Easing: easeInOutCubic (angenehme Kamerafahrt)
+function easeInOutCubic(t){ return t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2; }
+
+// Cancellation Token: wird erhöht, wenn eine neue Animation startet → alte hört sofort auf
+let tweenToken = 0;
+
+/**
+ * Tween Utility – bricht laufende Animation automatisch ab
+ * @param {number} durationMs
+ * @param {(t:number)=>void} onUpdate - t in [0,1]
+ * @param {()=>void} [onDone]
+ */
+function tween(durationMs, onUpdate, onDone){
+  // Barrierefreiheit: Animation deaktiviert → sofort ans Ziel springen
+  if (!animCfg.enabled) {
+    onUpdate(1);
+    onDone && onDone();
+    return;
+  }
+  const token = ++tweenToken;
+  const start = performance.now();
+  function step(now){
+    if (tweenToken !== token) return; // abgebrochen durch neuere Animation
+    const t = Math.min(1, (now - start)/Math.max(1,durationMs));
+    onUpdate(easeInOutCubic(t));
+    if (t < 1) requestAnimationFrame(step); else onDone && onDone();
+  }
+  requestAnimationFrame(step);
+}
+
+/**
+ * Lineare Kamerafahrt zu exakten Koordinaten (für animateCamera-API).
+ * Kein Bogenschwung – Host gibt explizite Zielposition vor.
+ */
+function animateCameraTo(position, target, durationMs=800){
+  const startPos = camera.position.clone();
+  const startTar = controls.target.clone();
+  const endPos = position ? new THREE.Vector3(position.x, position.y, position.z) : startPos.clone();
+  const endTar = target   ? new THREE.Vector3(target.x, target.y, target.z)       : startTar.clone();
+  tween(durationMs, t => {
+    camera.position.lerpVectors(startPos, endPos, t);
+    controls.target.lerpVectors(startTar, endTar, t);
+    controls.update();
+  });
+}
+
+/**
+ * Pivot-Punkt für Bogen-Kamerafahrten.
+ * Prüft root.userData.viewerPivot (aus Blender Custom Properties), sonst Bounding-Box-Mitte.
+ *
+ * In Blender setzen:
+ *   Object Properties → Custom Properties → Key: "viewerPivot", Value: [x, y, z]
+ *   GLTF-Export mit "Custom Properties" aktivieren.
+ */
+function getModelPivot() {
+  if (root) {
+    const vp = root.userData?.viewerPivot;
+    if (Array.isArray(vp) && vp.length >= 3 &&
+        isFinite(vp[0]) && isFinite(vp[1]) && isFinite(vp[2])) {
+      return new THREE.Vector3(vp[0], vp[1], vp[2]);
+    }
+    return new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3());
+  }
+  return new THREE.Vector3();
+}
+
+/**
+ * Animierte Kamerafahrt entlang eines Bogens (für focus()).
+ *
+ * Statt einer geraden Linie (die durch Objekte fahren kann) wird die Kamera
+ * in sphärischen Koordinaten um den Modell-Mittelpunkt interpoliert.
+ * Zusätzlich wird die Kamera in der Mitte der Fahrt nach oben geschwenkt
+ * (arcLift), damit sie sicher über das Modell fährt.
+ *
+ *  Phi (sphärisch) = Winkel von der Y-Achse:  0 = oben, π = unten
+ *  → kleines Phi = Kamera weiter oben
+ */
+function animateCameraArc(endPos, endTar, durationMs=1000){
+  const startPos = camera.position.clone();
+  const startTar = controls.target.clone();
+
+  // Pivot: userData.viewerPivot (Blender) oder Bounding-Box-Mittelpunkt
+  const pivot = getModelPivot();
+
+  // Optional: Mindestabstand = BoundingSphere × safeRadius (0 = deaktiviert)
+  // Nützlich für kompakte Modelle; für große Modelle (Brücke/Tunnel) auf 0 lassen.
+  let minRadius = 0;
+  if (arcCfg.safeRadius > 0 && root) {
+    const sphere = new THREE.Sphere();
+    new THREE.Box3().setFromObject(root).getBoundingSphere(sphere);
+    minRadius = sphere.radius * arcCfg.safeRadius;
+  }
+
+  // Start- und Endposition relativ zum Pivot in sphärische Koordinaten
+  const sph0 = new THREE.Spherical().setFromVector3(startPos.clone().sub(pivot));
+  const sph1 = new THREE.Spherical().setFromVector3(endPos.clone().sub(pivot));
+
+  // Kürzester Weg für Theta (keine 360°-Umrundung)
+  let dTheta = sph1.theta - sph0.theta;
+  if (dTheta >  Math.PI) dTheta -= 2 * Math.PI;
+  if (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+
+  // Bogenlift aus arcCfg — live per Debug-GUI oder URL-Param anpassbar
+  const arcLift = Math.min(Math.abs(dTheta) * arcCfg.liftFactor, arcCfg.liftMax);
+
+  const tmp = new THREE.Spherical();
+  const tmpV = new THREE.Vector3();
+
+  tween(durationMs, t => {
+    // minRadius-Clamp verhindert Einfahren in BoundingSphere (wenn arcSafe > 0)
+    const r     = Math.max(minRadius, THREE.MathUtils.lerp(sph0.radius, sph1.radius, t));
+    const theta = sph0.theta + dTheta * t;
+    // Phi interpolieren + Bogenlift in der Mitte (sin-Kurve, Peak bei t=0.5)
+    const phi   = THREE.MathUtils.clamp(
+      THREE.MathUtils.lerp(sph0.phi, sph1.phi, t) - arcLift * Math.sin(t * Math.PI),
+      0.05, Math.PI - 0.05
+    );
+
+    tmp.set(r, phi, theta);
+    camera.position.copy(tmpV.setFromSpherical(tmp).add(pivot));
+    controls.target.lerpVectors(startTar, endTar, t);
+    controls.update();
+  }, () => {
+    // Genau auf Zielposition einrasten
+    camera.position.copy(endPos);
+    controls.target.copy(endTar);
+    controls.update();
+  });
+}
+
+// ====== API: Host <-> Viewer via postMessage ======
+    const ALLOW_ORIGIN = '*' /* In Produktion hart setzen */;
+
+    function post(msg){ parent.postMessage({ source:'viewer', ...msg }, ALLOW_ORIGIN); }
+    post({type:'ready', payload:{ apiVersion:'1.0.0' }});
+
+    
+function setCamera(position, target, durationMs){
+  if (!position) return;
+  if (durationMs > 0) {
+    // animiert
+    animateCameraTo(position, target, durationMs);
+  } else {
+    // sofort (Legacy-Verhalten)
+    camera.position.set(position.x, position.y, position.z);
+    if (target) controls.target.set(target.x, target.y, target.z);
+    controls.update();
+  }
+  post({type:'camera', payload:{ position, target: target || {x:controls.target.x,y:controls.target.y,z:controls.target.z} }});
+}
+
+    
+function setVisible(selector, visible=true){
+  if (!root) return;
+  const list = Array.isArray(selector) ? selector : [selector];
+  list.forEach(sel=>{
+    if (sel === 'all'){ root.traverse(o=>{ if(o.isMesh) o.visible = visible; }); return; }
+    const obj = resolveSelector(sel);
+    if (obj) obj.traverse ? obj.traverse(o=>{ if(o.isMesh) o.visible = visible; }) : (obj.visible = visible);
+  });
+}
+
+
+    function enableOrbit(enabled){ controls.enabled = !!enabled; }
+    
+function focusNode(selector, padding=1.3){
+  if (!root) return;
+  const targetObj = resolveSelector(selector);
+  if (!targetObj) return;
+  const box = new THREE.Box3().setFromObject(targetObj);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const dist = (maxDim / (2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)))) * padding;
+  const dirVec = new THREE.Vector3(1, 0.6, 1).normalize();
+  camera.position.copy(center.clone().add(dirVec.multiplyScalar(dist)));
+  controls.target.copy(center);
+  controls.update();
+}
+
+    
+// === Generische API-Wrapper ===
+function setVisibility(selector, visible=true){ setVisible(selector, visible); }
+function setOrbitEnabled(enabled){ enableOrbit(enabled); }
+
+function focus(selector, padding=1.3, animateMs=800, positionOverride=null, targetOverride=null){
+  if (!root) return;
+  const targetObj = resolveSelector(selector) || root;
+
+  // ── Ziel-Target: explizit oder Objekt-Mittelpunkt ──────────────
+  let endTarget;
+  if (targetOverride && isFinite(targetOverride.x)) {
+    endTarget = new THREE.Vector3(targetOverride.x, targetOverride.y, targetOverride.z);
+  } else {
+    endTarget = new THREE.Box3().setFromObject(targetObj).getCenter(new THREE.Vector3());
+  }
+
+  // ── Kamera-Position: explizit oder automatisch berechnen ───────
+  let newPos;
+  if (positionOverride && isFinite(positionOverride.x)) {
+    newPos = new THREE.Vector3(positionOverride.x, positionOverride.y, positionOverride.z);
+  } else {
+    const box = new THREE.Box3().setFromObject(targetObj);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    let maxDim = Math.max(size.x, size.y, size.z);
+    if (!isFinite(maxDim) || maxDim <= 0) maxDim = Math.max(1, new THREE.Box3().setFromObject(root).getSize(new THREE.Vector3()).length() * 0.25);
+    const dist = (maxDim / (2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2)))) * (padding||1.3);
+
+    // Blickrichtung: von Modell-Mittelpunkt → Zielobjekt-Mittelpunkt (immer nach außen).
+    const rootCenter = new THREE.Box3().setFromObject(root).getCenter(new THREE.Vector3());
+    let viewDir = new THREE.Vector3().subVectors(center, rootCenter);
+    if (viewDir.lengthSq() < 1e-6) viewDir.set(1, 0.6, 1);
+    viewDir.normalize();
+
+    newPos = center.clone().add(viewDir.multiplyScalar(dist));
+  }
+
+  // Bogenkamerafahrt statt gerader Linie → fährt nicht durch Objekte hindurch
+  animateCameraArc(newPos, endTarget, animateMs || 1000);
+}
+
+    
+// Debug-Bounding-Boxes ein/aus (wird im switch verwendet)
+function setDebug(params){
+  const show = !!(params && params.bounds);
+  root?.traverse(o=>{
+    if (!o.isMesh) return;
+    if (show && !o.userData._bboxHelper) {
+      const h = new THREE.BoxHelper(o, 0xffff00); scene.add(h); o.userData._bboxHelper = h;
+    } else if (!show && o.userData._bboxHelper) {
+      scene.remove(o.userData._bboxHelper);
+      o.userData._bboxHelper = null;
+    }
+  });
+}
+
+window.addEventListener('message', (event)=>{
+      const data = event.data || {};
+      const { type, payload } = data;
+      if (!type) return;
+      
+console.log('[host→viewer]', type, payload);
+switch(type){
+  // ── Neue API v1 (animiert) ──────────────────────────────────────
+  case 'animateCamera':
+    if (payload?.position) {
+      const p = payload.position, t = payload.target;
+      const endPos = new THREE.Vector3(p.x, p.y, p.z);
+      const endTar = t ? new THREE.Vector3(t.x, t.y, t.z) : controls.target.clone();
+      animateCameraArc(endPos, endTar, payload?.durationMs ?? 800);
+    }
+    break;
+  case 'focus':
+    focus(payload?.selector, payload?.padding, payload?.durationMs ?? 800, payload?.position ?? null, payload?.target ?? null);
+    break;
+  case 'setVisibility':
+    setVisible(payload?.selector, payload?.visible !== false);
+    break;
+  case 'setOrbitEnabled':
+    enableOrbit(payload?.enabled !== false);
+    break;
+  case 'setAnimationEnabled':
+    animCfg.enabled = payload?.enabled !== false;
+    break;
+  case 'setHover':
+    if (payload?.selector) _applyExternalHover(payload.selector);
+    else _clearExternalHover();
+    break;
+
+  case 'setOrbitConstraints': {
+    const p = payload || {};
+    if (p.reset) {
+      controls.minAzimuthAngle = -Infinity;
+      controls.maxAzimuthAngle =  Infinity;
+      controls.minPolarAngle   = 0;
+      controls.maxPolarAngle   = Math.PI;
+      controls.minDistance     = 0;
+      controls.maxDistance     = Infinity;
+    } else {
+      const toRad = d => d * Math.PI / 180;
+      if (p.azimuthMin  != null) controls.minAzimuthAngle = toRad(p.azimuthMin);
+      if (p.azimuthMax  != null) controls.maxAzimuthAngle = toRad(p.azimuthMax);
+      if (p.polarMin    != null) controls.minPolarAngle   = toRad(p.polarMin);
+      if (p.polarMax    != null) controls.maxPolarAngle   = toRad(p.polarMax);
+      if (p.distanceMin != null) controls.minDistance     = p.distanceMin;
+      if (p.distanceMax != null) controls.maxDistance     = p.distanceMax;
+    }
+    controls.update();
+    break;
+  }
+
+  // ── Legacy API (Abwärtskompatibilität) ──────────────────────────
+  case 'setCamera':
+    setCamera(payload?.position, payload?.target, payload?.durationMs);
+    break;
+  case 'setVisible':
+    setVisible(payload?.selector, payload?.visible !== false);
+    break;
+  case 'enableOrbit':
+    enableOrbit(payload?.enabled !== false);
+    break;
+  case 'focusNode':
+    focusNode(payload?.selector, payload?.padding);
+    break;
+  case 'focusWheel':
+    // jetzt animiert statt sofort
+    focus('wheel'+(payload?.index||1), payload?.padding || 1.4, payload?.durationMs ?? 800);
+    break;
+  case 'setWheelVisible':
+    setVisible('wheel'+(payload?.index||1), payload?.visible !== false);
+    break;
+  case 'playClip':
+    break;
+  case 'setDebug':
+    setDebug(payload);
+    break;
+}
+    });
+
+    // HUD-Buttons
+    $('#btnOrbit').addEventListener('click', ()=> enableOrbit(!controls.enabled) );
+    let boundsOn = false;
+    $('#btnBounds').addEventListener('click', ()=> { boundsOn=!boundsOn; setDebug({bounds:boundsOn}); });
+  </script>
+</body>
+</html>

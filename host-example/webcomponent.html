@@ -1,0 +1,40 @@
+
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Web Component (Legacy, ohne Animation)</title>
+  <style>
+    body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:#0b0d12; color:#eaeff6; }
+    header,main { max-width:1100px; margin:0 auto; padding:18px; }
+    x-3d-viewer { display:block; width:100%; max-width:1100px; margin:0 auto; }
+    .controls { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+    button { background:#1a1f29; color:#e6e8ee; border:1px solid #283041; padding:10px 12px; border-radius:10px; cursor:pointer; }
+    button:hover { background:#212836; }
+  </style>
+</head>
+<body>
+  <header><h1>Web Component (ohne animierte Kamerafahrt)</h1></header>
+  <main>
+    <script type="module" src="../embed/webcomponent.js"></script>
+    <x-3d-viewer src="../viewer/index.html?model=../assets/ae86.glb" theme="dark" lang="de" aspect="16/9"></x-3d-viewer>
+
+    <div class="controls">
+      <button id="btn1">Kamera zu Wheel1</button>
+      <button id="btn3">Kamera zu Wheel3</button>
+      <button id="hide3">Wheel3 ausblenden</button>
+      <button id="showAll">Alles einblenden</button>
+    </div>
+  </main>
+
+  <script>
+    const el = document.querySelector('x-3d-viewer');
+    // Legacy-Methoden sind im Wrapper weiterhin vorhanden
+    document.getElementById('btn1').addEventListener('click', ()=> el.focusNode('wheel1', 1.5) );
+    document.getElementById('btn3').addEventListener('click', ()=> el.focusNode('wheel3', 1.5) );
+    document.getElementById('hide3').addEventListener('click', ()=> el.setVisible('wheel3', false) );
+    document.getElementById('showAll').addEventListener('click', ()=> el.setVisible('all', true) );
+  </script>
+</body>
+</html>
