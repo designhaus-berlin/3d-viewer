@@ -28,7 +28,7 @@ Kein Scope: Interaktive API-Console, npm-Paket, CDN-Hosting, Animation-Steuerung
 - **D-06:** `db-header` / `db-navigation` — Seitenheader mit Projektname + GitHub-Link
 - **D-07:** `db-tabs` — Tab-Navigation unter dem Viewer
 - **D-08:** `db-button` — Kamera-Preset Buttons in den Tabs
-- **D-09:** Accordion — für evtl. Beschreibungstexte oder Bauteil-Gruppen (falls im AE86 sinnvoll)
+- **D-09:** Accordion — jeder Tab hat ein Accordion mit Kamera-Preset-Gruppe + kurze Beschreibung der Ansicht
 - **D-10:** Alle DB UX Komponenten werden self-hosted aus `vendor/db-ux/` geladen — kein CDN
 
 ### Demo-Seite: Sprache
@@ -45,9 +45,9 @@ Kein Scope: Interaktive API-Console, npm-Paket, CDN-Hosting, Animation-Steuerung
 - **D-17:** Legacy-Commands mit Deprecation-Hinweis markieren: Tabelle "Alte API → Neuer Name"
 
 ### GitHub Pages / Deployment (DOC-02)
-- **D-18:** Deployed aus `/docs`-Ordner auf `master`-Branch → `designhaus-berlin.github.io/3d-viewer`
-- **D-19:** Viewer `iframe` zeigt auf relativen Pfad (`../viewer/index.html` oder equivalent in docs/)
-- **D-20:** AE86-Asset muss in `docs/` oder per relativem Pfad erreichbar sein (kein externer Asset-Server)
+- **D-18:** GitHub Pages auf **Repo-Root** (`master` / `(root)`) konfiguriert — Demo unter `designhaus-berlin.github.io/3d-viewer/docs/index.html` erreichbar. *(Revidiert: ursprünglich /docs-Ordner, aber relativer Pfad `../viewer/index.html` erfordert Repo-Root-Serving.)*
+- **D-19:** Viewer `iframe` zeigt auf relativen Pfad `../viewer/index.html` (relativ von `docs/` → Repo-Root `viewer/`)
+- **D-20:** AE86-Asset per relativem Pfad `../assets/ae86.glb` vom iframe erreichbar (Repo-Root `assets/`)
 
 ### Claude's Discretion
 - Genaue Farbgebung und Abstände im Hero-Bereich (DB UX Design Tokens werden verwendet)
