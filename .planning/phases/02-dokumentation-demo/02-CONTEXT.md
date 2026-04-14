@@ -29,7 +29,9 @@ Kein Scope: Interaktive API-Console, npm-Paket, CDN-Hosting, Animation-Steuerung
 - **D-07:** `db-tabs` — Tab-Navigation unter dem Viewer
 - **D-08:** `db-button` — Kamera-Preset Buttons in den Tabs
 - **D-09:** Accordion — jeder Tab hat ein Accordion mit Kamera-Preset-Gruppe + kurze Beschreibung der Ansicht
-- **D-10:** Alle DB UX Komponenten werden self-hosted aus `vendor/db-ux/` geladen — kein CDN
+- **D-10:** DB UX Komponenten werden von jsDelivr CDN geladen — kein Self-Hosting nötig, da DB unser Kunde ist
+    - CSS: `https://cdn.jsdelivr.net/npm/@db-ux/core-foundations@4.5.0/build/styles/rollup.css`
+    - JS: `https://cdn.jsdelivr.net/npm/@db-ux/wc-core-components@4.5.0/dist/esm/db-ux.js`
 
 ### Demo-Seite: Sprache
 - **D-11:** Deutsch — Demo-Seite in deutscher Sprache (Primärzielgruppe: DE-Kunden und eigener Einsatz)
@@ -61,9 +63,10 @@ Kein Scope: Interaktive API-Console, npm-Paket, CDN-Hosting, Animation-Steuerung
 <specifics>
 ## Spezifische Anforderungen
 
-- DB UX Design System wird self-hosted unter `vendor/db-ux/` ausgeliefert — keine Requests an `cdn.jsdelivr.net` oder andere externe Server (Datenschutz-Constraint aus PROJECT.md)
-- Die bestehende `host-example/index.html` lädt DB UX aktuell vom CDN — diese Abhängigkeit muss für die GitHub-Pages-Demo eliminiert werden
-- DB UX Pakete: `@db-ux/wc-core-components` + `@db-ux/core-foundations`, Apache-2.0, selbst gehostet
+- DB UX Design System wird per jsDelivr CDN eingebunden — kein Self-Hosting, da DB unser Kunde ist (CDN-Abhängigkeit akzeptiert per D-10)
+- Der Datenschutz-Constraint (kein CDN) gilt für den Viewer selbst (`viewer/index.html`), nicht für Demo-Seiten
+- DB UX Pakete: `@db-ux/wc-core-components@4.5.0` + `@db-ux/core-foundations@4.5.0`, Apache-2.0, CDN-gebunden
+- CDN-URLs: CSS `https://cdn.jsdelivr.net/npm/@db-ux/core-foundations@4.5.0/build/styles/rollup.css`, JS `https://cdn.jsdelivr.net/npm/@db-ux/wc-core-components@4.5.0/dist/esm/db-ux.js`
 - `assets/ae86.glb` (812 KB) ist klein genug für GitHub Pages direkt
 - Die Demo soll alle `postMessage`-Commands zeigen, die in `docs/api.md` stehen — als lebendige Dokumentation
 
@@ -84,7 +87,7 @@ Kein Scope: Interaktive API-Console, npm-Paket, CDN-Hosting, Animation-Steuerung
 - `host-example/index.html` — Bestehende Demo-Seite (Layout-Referenz, zeigt welche DB UX Komponenten bereits verwendet werden)
 
 ### Design System
-- `vendor/db-ux/` — Ziel-Verzeichnis für self-hosted DB UX Assets (noch nicht vorhanden — researcher soll ermitteln welche Pakete und welche Dateien dort landen)
+- DB UX CDN: `https://cdn.jsdelivr.net/npm/@db-ux/core-foundations@4.5.0/` + `@db-ux/wc-core-components@4.5.0/` — kein lokaler Vendor-Baum nötig
 
 ### Bestehender Viewer
 - `viewer/index.html` — Viewer-Quellcode; zeigt welche URL-Parameter und postMessage-Commands tatsächlich implementiert sind (Source of Truth für api.md)
