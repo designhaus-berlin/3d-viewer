@@ -71,6 +71,7 @@ None.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260413-pfh | CONCERNS.md triage + quick-fixes: onPick filter, legacy warns, modelReady, host-example ORIGIN | 2026-04-13 | e8b7e2c | [260413-pfh-concerns-md-triage-und-quick-fixes-onpic](./quick/260413-pfh-concerns-md-triage-und-quick-fixes-onpic/) |
+| 260414-nid | DB UX CDN statt self-hosted: D-10 revidiert, 02-01-PLAN Task 1 vereinfacht, 02-RESEARCH Update-Note | 2026-04-14 | b442ac6 | [260414-nid-db-ux-cdn-statt-self-hosted-context-md-d](./quick/260414-nid-db-ux-cdn-statt-self-hosted-context-md-d/) |
 
 ---
 
