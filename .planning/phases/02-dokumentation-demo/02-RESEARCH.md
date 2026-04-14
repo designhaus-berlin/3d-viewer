@@ -6,6 +6,15 @@
 
 ---
 
+## Update Note
+
+**UPDATE 2026-04-14:** DB UX wird per CDN eingebunden (kein Self-Hosting) — Task 1 des
+ursprünglichen Plans entfällt. DB ist Kunde, CDN-Abhängigkeit akzeptiert. D-10 in
+CONTEXT.md wurde entsprechend revidiert. `02-01-PLAN.md` Task 1 ist jetzt: "2 HTML-Zeilen
+im Head einbinden" statt "30+ curl-Downloads nach vendor/db-ux/".
+
+---
+
 <user_constraints>
 ## User Constraints (from CONTEXT.md)
 
